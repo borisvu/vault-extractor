@@ -113,4 +113,75 @@ Invalid frontmatter test`
     const folder1Output = await fs.readFile(path.join(outputDir, 'folder1.md'), 'utf8');
     expect(folder1Output).toContain('Invalid frontmatter test');
   });
+
+  test('should process nested folders recursively', async () => {
+    // Create a deeply nested structure
+    const nestedDir = path.join(fixturesDir, 'vault', 'nested', 'subfolder', 'deep');
+    await fs.mkdir(nestedDir, { recursive: true });
+
+    // Create test files
+    await fs.writeFile(
+      path.join(nestedDir, 'deep-file.md'),
+      `---
+title: Deep File
+---
+Content in deep folder`
+    );
+
+    // Create a new config with nested folder
+    const nestedConfig = {
+      vault: path.join(fixturesDir, 'vault'),
+      folders: ['nested'],
+      output: outputDir,
+    };
+    const nestedConfigPath = path.join(outputDir, 'nested-config.json');
+    await fs.writeFile(nestedConfigPath, JSON.stringify(nestedConfig));
+
+    // Process the vault with nested config
+    await processVault(nestedConfigPath, mockLogger);
+
+    // Verify output
+    const nestedOutput = await fs.readFile(path.join(outputDir, 'nested.md'), 'utf8');
+    expect(nestedOutput).toContain('# subfolder/deep/deep-file.md');
+    expect(nestedOutput).toContain('Content in deep folder');
+  });
+
+  test('should use last part of folder path for output file name', async () => {
+    // Create a folder with path segments
+    const segmentedDir = path.join(fixturesDir, 'vault', 'PARA', '2 Areas');
+    await fs.mkdir(segmentedDir, { recursive: true });
+
+    // Create test file
+    await fs.writeFile(
+      path.join(segmentedDir, 'test.md'),
+      `---
+title: Area Test
+---
+Content in areas`
+    );
+
+    // Create a new config with segmented folder path
+    const segmentedConfig = {
+      vault: path.join(fixturesDir, 'vault'),
+      folders: ['PARA/2 Areas'],
+      output: outputDir,
+    };
+    const segmentedConfigPath = path.join(outputDir, 'segmented-config.json');
+    await fs.writeFile(segmentedConfigPath, JSON.stringify(segmentedConfig));
+
+    // Process the vault with segmented config
+    await processVault(segmentedConfigPath, mockLogger);
+
+    // Verify output file is named after last segment
+    const exists = await fs
+      .access(path.join(outputDir, '2 Areas.md'))
+      .then(() => true)
+      .catch(() => false);
+    expect(exists).toBe(true);
+
+    // Verify content
+    const areaOutput = await fs.readFile(path.join(outputDir, '2 Areas.md'), 'utf8');
+    expect(areaOutput).toContain('# test.md');
+    expect(areaOutput).toContain('Content in areas');
+  });
 });

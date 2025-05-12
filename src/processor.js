@@ -142,24 +142,36 @@ export async function processVault(configPath, logger) {
     const totalFiles = allFiles.size;
     progressBar.start(totalFiles, 0);
 
+    // Create a Map to track write streams
+    const writeStreams = new Map();
+
     // Second pass: process files
     for (const [file, folder] of allFiles) {
       const sourceDir = path.join(config.vault, folder);
-      const outputPath = path.join(config.output, `${folder}.md`);
+      // Use only the last part of the folder path for the output file
+      const folderName = path.basename(folder);
+      const outputPath = path.join(config.output, `${folderName}.md`);
 
       try {
-        // Create or append to write stream
-        const writeStream = createWriteStream(outputPath, { flags: 'a' });
-        const relativePath = path.relative(sourceDir, file);
+        // Get or create write stream
+        let writeStream = writeStreams.get(outputPath);
+        if (!writeStream) {
+          writeStream = createWriteStream(outputPath, { flags: 'w' }); // 'w' to overwrite
+          writeStreams.set(outputPath, writeStream);
+        }
 
+        const relativePath = path.relative(sourceDir, file);
         await processFile(file, writeStream, relativePath, logger);
         processedFiles.add(file);
         progressBar.update(processedFiles.size);
-
-        writeStream.end();
       } catch (error) {
         logger.error(`Error processing ${file}: ${error.message}`);
       }
+    }
+
+    // Close all write streams
+    for (const writeStream of writeStreams.values()) {
+      writeStream.end();
     }
 
     // Log final statistics
