@@ -31,6 +31,8 @@ npm link
 1. Generate a template configuration file:
 
 ```bash
+combine-md --init-config=config.json
+# OR
 combine-md --init-config config.json
 ```
 
@@ -60,8 +62,13 @@ combine-md [options]
 Options:
   --config, -c       Path to configuration file                   [string] [required]
   --log, -l         Path to log file                             [string]
-  --init-config     Generate template config file at specified path
+  --init-config     Path where to create template config file     [string] [requires argument]
   --help            Show help                                    [boolean]
+
+Examples:
+  combine-md --init-config=config.json     Create template config file
+  combine-md --config config.json          Process vault using config file
+  combine-md -c config.json -l app.log     Process vault with logging enabled
 ```
 
 ### Configuration File

@@ -20,10 +20,14 @@ const argv = yargs(hideBin(process.argv))
   .option('init-config', {
     type: 'string',
     description: 'Generate template config file at specified path',
+    requiresArg: true,
+    nargs: 1,
   })
   .check((argv) => {
     // If init-config is specified, config is not required
-    if (argv['init-config']) return true;
+    if (argv['init-config']) {
+      return true;
+    }
 
     // For all other operations, config is required
     if (!argv.config) {
