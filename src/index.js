@@ -22,8 +22,13 @@ const argv = yargs(hideBin(process.argv))
     description: 'Generate template config file at specified path',
   })
   .check((argv) => {
+    // If init-config is specified, config is not required
     if (argv['init-config']) return true;
-    if (!argv.config) throw new Error('--config is required');
+
+    // For all other operations, config is required
+    if (!argv.config) {
+      throw new Error('--config is required unless using --init-config');
+    }
     return true;
   })
   .help().argv;
@@ -35,8 +40,12 @@ async function main() {
 
     // Handle config initialization
     if (argv['init-config']) {
-      await initConfig(argv['init-config']);
-      logger.info(`Template config file created at: ${argv['init-config']}`);
+      const configPath = argv['init-config'];
+      if (!configPath) {
+        throw new Error('--init-config requires a path argument');
+      }
+      await initConfig(configPath);
+      logger.info(`Template config file created at: ${configPath}`);
       return;
     }
 

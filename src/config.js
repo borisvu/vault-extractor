@@ -1,23 +1,44 @@
-import fs from "fs/promises";
-import path from "path";
+import fs from 'fs/promises';
+import path from 'path';
 
 const DEFAULT_CONFIG = {
-  vault: "/path/to/your/vault",
-  folders: ["FolderA", "FolderB"],
-  output: "/path/to/output/directory",
+  vault: '/path/to/your/vault',
+  folders: ['FolderA', 'FolderB'],
+  output: '/path/to/output/directory',
 };
 
 export async function initConfig(configPath) {
-  const config = JSON.stringify(DEFAULT_CONFIG, null, 2);
-  await fs.writeFile(configPath, config, "utf8");
+  try {
+    // Check if file already exists
+    try {
+      await fs.access(configPath);
+      throw new Error('Config file already exists');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+
+    // Ensure directory exists
+    const configDir = path.dirname(configPath);
+    try {
+      await fs.mkdir(configDir, { recursive: true });
+    } catch (error) {
+      throw new Error(`Failed to create directory: ${error.message}`);
+    }
+
+    // Write config file
+    const config = JSON.stringify(DEFAULT_CONFIG, null, 2);
+    await fs.writeFile(configPath, config, 'utf8');
+  } catch (error) {
+    throw new Error(`Failed to initialize config: ${error.message}`);
+  }
 }
 
 export async function loadConfig(configPath) {
   let configContent;
   try {
-    configContent = await fs.readFile(configPath, "utf8");
+    configContent = await fs.readFile(configPath, 'utf8');
   } catch (error) {
-    if (error.code === "ENOENT") {
+    if (error.code === 'ENOENT') {
       throw new Error(`Config file not found: ${configPath}`);
     }
     throw error;
@@ -28,7 +49,7 @@ export async function loadConfig(configPath) {
 
     // Validate required fields
     if (!config.vault || !config.folders || !config.output) {
-      throw new Error("Config must contain vault, folders, and output fields");
+      throw new Error('Config must contain vault, folders, and output fields');
     }
 
     // Ensure paths are absolute
@@ -42,7 +63,7 @@ export async function loadConfig(configPath) {
         throw new Error(`Vault path is not a directory: ${config.vault}`);
       }
     } catch (error) {
-      if (error.code === "ENOENT") {
+      if (error.code === 'ENOENT') {
         throw new Error(`Vault directory not found: ${config.vault}`);
       }
       throw error;
@@ -53,7 +74,7 @@ export async function loadConfig(configPath) {
 
     return config;
   } catch (error) {
-    if (error.message.startsWith("Vault directory not found:")) {
+    if (error.message.startsWith('Vault directory not found:')) {
       throw error;
     }
     throw new Error(`Invalid config file: ${error.message}`);
