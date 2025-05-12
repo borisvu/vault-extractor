@@ -1,12 +1,10 @@
-import fs from "fs";
-import path from "path";
+import fs from 'fs';
+import path from 'path';
 
 class Logger {
   constructor(logPath) {
     this.logPath = logPath;
-    this.stream = logPath
-      ? fs.createWriteStream(logPath, { flags: "a" })
-      : null;
+    this.stream = logPath ? fs.createWriteStream(logPath, { flags: 'a' }) : null;
   }
 
   _formatMessage(level, message) {
@@ -17,8 +15,12 @@ class Logger {
   _write(level, message) {
     const formattedMessage = this._formatMessage(level, message);
 
-    // Always write to console
-    console[level.toLowerCase()](formattedMessage.trim());
+    // Write to stderr for error/warn, stdout for info
+    if (level === 'ERROR' || level === 'WARN') {
+      process.stderr.write(formattedMessage);
+    } else {
+      process.stdout.write(formattedMessage);
+    }
 
     // Write to file if stream exists
     if (this.stream) {
@@ -27,15 +29,15 @@ class Logger {
   }
 
   info(message) {
-    this._write("INFO", message);
+    this._write('INFO', message);
   }
 
   warn(message) {
-    this._write("WARN", message);
+    this._write('WARN', message);
   }
 
   error(message) {
-    this._write("ERROR", message);
+    this._write('ERROR', message);
   }
 
   close() {

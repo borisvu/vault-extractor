@@ -23,52 +23,82 @@ async function findMarkdownFiles(dir) {
 
 async function processFile(filePath, writeStream, relativePath, logger) {
   return new Promise((resolve, reject) => {
-    let frontmatterStart = false;
-    let frontmatterEnd = false;
-    let frontmatter = "";
-    let isFirstContent = true;
+    let frontmatterContent = "";
+    let inFrontmatter = false;
+    let frontmatterProcessed = false;
+    let buffer = "";
 
     const readStream = createReadStream(filePath, { encoding: "utf8" });
 
     readStream.on("data", (chunk) => {
-      if (!frontmatterEnd) {
-        frontmatter += chunk;
-        const fmEndIndex = frontmatter.indexOf("---\n", 3);
+      if (frontmatterProcessed) {
+        writeStream.write(chunk);
+        return;
+      }
 
-        if (fmEndIndex !== -1) {
-          frontmatterEnd = true;
-          const fmContent = frontmatter.slice(0, fmEndIndex + 4);
+      buffer += chunk;
+
+      // Check for frontmatter start
+      if (!inFrontmatter && buffer.startsWith("---\n")) {
+        inFrontmatter = true;
+        frontmatterContent = "";
+      }
+
+      if (inFrontmatter) {
+        const endIndex = buffer.indexOf("\n---\n", 4);
+        if (endIndex !== -1) {
+          frontmatterContent = buffer.slice(4, endIndex);
+          frontmatterProcessed = true;
 
           try {
-            // Parse frontmatter to validate it
-            const fmData = yaml.load(fmContent.slice(3, -4));
+            const fmData = yaml.load(frontmatterContent);
 
-            // Write the heading and frontmatter
+            // Validate frontmatter structure
+            if (typeof fmData !== "object" || fmData === null) {
+              throw new Error("Frontmatter must be a valid YAML object");
+            }
+
+            // Validate date field if present
+            if (fmData.date && isNaN(Date.parse(fmData.date))) {
+              throw new Error("Invalid date format in frontmatter");
+            }
+
+            // Write the heading and valid frontmatter
             writeStream.write(`\n# ${relativePath}\n\n`);
-            writeStream.write(fmContent);
+            writeStream.write("---\n");
+            writeStream.write(frontmatterContent);
+            writeStream.write("\n---\n");
 
-            // Write remaining content from this chunk
-            const remainingContent = frontmatter.slice(fmEndIndex + 4);
-            if (remainingContent) writeStream.write(remainingContent);
+            // Write remaining content
+            const remaining = buffer.slice(endIndex + 4);
+            if (remaining) writeStream.write(remaining);
           } catch (error) {
             logger.warn(`Invalid frontmatter in ${filePath}: ${error.message}`);
-            // Still write the content, but without parsing the frontmatter
+            // Write content without parsing frontmatter
             writeStream.write(`\n# ${relativePath}\n\n`);
-            writeStream.write(frontmatter);
+            writeStream.write("---\n");
+            writeStream.write(frontmatterContent);
+            writeStream.write("\n---\n");
+            const remaining = buffer.slice(endIndex + 4);
+            if (remaining) writeStream.write(remaining);
           }
 
-          frontmatter = "";
+          buffer = "";
         }
-      } else {
-        writeStream.write(chunk);
+      } else if (buffer.length > 3 && !buffer.startsWith("---\n")) {
+        // No frontmatter found, write directly
+        frontmatterProcessed = true;
+        writeStream.write(`\n# ${relativePath}\n\n`);
+        writeStream.write(buffer);
+        buffer = "";
       }
     });
 
     readStream.on("end", () => {
-      if (!frontmatterEnd && frontmatter) {
-        // No frontmatter found, write the content directly
+      if (!frontmatterProcessed && buffer) {
+        // Handle any remaining content
         writeStream.write(`\n# ${relativePath}\n\n`);
-        writeStream.write(frontmatter);
+        writeStream.write(buffer);
       }
       writeStream.write("\n\n");
       resolve();
@@ -82,8 +112,8 @@ async function processFile(filePath, writeStream, relativePath, logger) {
 
 export async function processVault(configPath, logger) {
   const config = await loadConfig(configPath);
-  let totalFiles = 0;
-  let processedFiles = 0;
+  const allFiles = new Map(); // Track all files to avoid duplicates
+  const processedFiles = new Set(); // Track successfully processed files
 
   // Create progress bar
   const progressBar = new cliProgress.SingleBar({
@@ -93,55 +123,50 @@ export async function processVault(configPath, logger) {
   });
 
   try {
-    // Count total files first
+    // First pass: collect all files
     for (const folder of config.folders) {
       const sourceDir = path.join(config.vault, folder);
       try {
         const files = await findMarkdownFiles(sourceDir);
-        totalFiles += files.length;
+        files.forEach((file) => allFiles.set(file, folder));
       } catch (error) {
         logger.warn(`Skipping folder ${folder}: ${error.message}`);
       }
     }
 
+    const totalFiles = allFiles.size;
     progressBar.start(totalFiles, 0);
 
-    // Process each folder
-    for (const folder of config.folders) {
+    // Second pass: process files
+    for (const [file, folder] of allFiles) {
       const sourceDir = path.join(config.vault, folder);
-      let outputPath = path.join(config.output, `${folder}.md`);
+      const outputPath = path.join(config.output, `${folder}.md`);
 
       try {
-        const files = await findMarkdownFiles(sourceDir);
-        if (files.length === 0) {
-          logger.warn(`No markdown files found in ${folder}`);
-          continue;
-        }
+        // Create or append to write stream
+        const writeStream = createWriteStream(outputPath, { flags: "a" });
+        const relativePath = path.relative(sourceDir, file);
 
-        const writeStream = createWriteStream(outputPath);
-
-        for (const file of files) {
-          try {
-            const relativePath = path.relative(sourceDir, file);
-            await processFile(file, writeStream, relativePath, logger);
-            processedFiles++;
-            progressBar.update(processedFiles);
-          } catch (error) {
-            logger.error(`Error processing ${file}: ${error.message}`);
-          }
-        }
+        await processFile(file, writeStream, relativePath, logger);
+        processedFiles.add(file);
+        progressBar.update(processedFiles.size);
 
         writeStream.end();
-        logger.info(`Created ${outputPath}`);
       } catch (error) {
-        logger.error(`Error processing folder ${folder}: ${error.message}`);
+        logger.error(`Error processing ${file}: ${error.message}`);
       }
     }
+
+    // Log final statistics
+    logger.info("Processing complete");
+    logger.info(`Total folders processed: ${config.folders.length}`);
+    logger.info(`Total files processed: ${processedFiles.size}/${totalFiles}`);
   } finally {
     progressBar.stop();
   }
 
-  logger.info(`\nProcessing complete:`);
-  logger.info(`- Total folders processed: ${config.folders.length}`);
-  logger.info(`- Total files processed: ${processedFiles}/${totalFiles}`);
+  return {
+    totalFiles: allFiles.size,
+    processedFiles: processedFiles.size,
+  };
 }

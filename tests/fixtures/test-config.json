@@ -1,0 +1,8 @@
+{
+    "vault": "./tests/fixtures/vault",
+    "folders": [
+        "folder1",
+        "folder2"
+    ],
+    "output": "./tests/fixtures/output"
+}
