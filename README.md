@@ -1,6 +1,11 @@
 # Vault Extractor
 
-A powerful Node.js CLI tool for combining and processing Obsidian markdown files from specified vault folders. Perfect for creating consolidated exports, backups, or sharing specific sections of your vault.
+A simple Node.js CLI tool for combining and processing Obsidian markdown files from specified vault folders.
+Intended for creating consolidated exports for using within NotebookLM that cannot handle a large number of small files.
+
+My first attempt at "vibe-coding".
+Created specifications with GhatGPT.
+Implemented using Cursor.
 
 ## Features
 

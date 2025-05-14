@@ -1,7 +1,7 @@
 {
     "name": "vault-extractor",
     "version": "1.0.0",
-    "description": "CLI tool to combine Obsidian markdown files from specified vault folders",
+    "description": "CLI tool to combine Obsidian markdown files from specified vault folders. Intended for use with NotebookLM.",
     "type": "module",
     "bin": {
         "combine-md": "./src/index.js"
@@ -15,7 +15,8 @@
     "keywords": [
         "obsidian",
         "markdown",
-        "cli"
+        "cli",
+        "notebooklm"
     ],
     "author": "",
     "license": "MIT",
