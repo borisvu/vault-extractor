@@ -24,7 +24,8 @@ tests/fixtures/output/
 .env.local
 .env.*.local
 
-/*config*.json 
+# Runtime config files
+*config*.json 
 
 # Coverage
 coverage

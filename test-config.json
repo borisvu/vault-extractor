@@ -1,8 +1,0 @@
-{
-  "vault": "/path/to/your/vault",
-  "folders": [
-    "FolderA",
-    "FolderB"
-  ],
-  "output": "/path/to/output/directory"
-}
